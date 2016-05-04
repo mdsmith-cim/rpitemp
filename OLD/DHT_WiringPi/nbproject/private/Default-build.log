@@ -1,0 +1,7 @@
+gcc -c -o obj/getTemp.o getTemp.c -I./include -O3 -std=gnu99 -Wall
+gcc -o getTemp obj/getTemp.o -I./include -O3 -std=gnu99 -Wall -lwiringPi -lrt
+/usr/lib/gcc/x86_64-linux-gnu/4.8/../../../../lib/libwiringPi.so: undefined reference to `pthread_join'
+/usr/lib/gcc/x86_64-linux-gnu/4.8/../../../../lib/libwiringPi.so: undefined reference to `pthread_create'
+/usr/lib/gcc/x86_64-linux-gnu/4.8/../../../../lib/libwiringPi.so: undefined reference to `pthread_cancel'
+collect2: error: ld returned 1 exit status
+make: *** [getTemp] Error 1
