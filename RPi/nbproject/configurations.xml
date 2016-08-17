@@ -1,0 +1,195 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configurationDescriptor version="97">
+  <logicalFolder name="root" displayName="root" projectFiles="true" kind="ROOT">
+    <logicalFolder name="HeaderFiles"
+                   displayName="Header Files"
+                   projectFiles="true">
+      <itemPath>RHCRC.h</itemPath>
+      <itemPath>RHDatagram.h</itemPath>
+      <itemPath>RHGenericDriver.h</itemPath>
+      <itemPath>RHGenericSPI.h</itemPath>
+      <itemPath>RHHardwareSPI.h</itemPath>
+      <itemPath>RHNRFSPIDriver.h</itemPath>
+      <itemPath>RHReliableDatagram.h</itemPath>
+      <itemPath>RHSPIDriver.h</itemPath>
+      <itemPath>RH_NRF24.h</itemPath>
+      <itemPath>RadioHead.h</itemPath>
+      <itemPath>RasPi.h</itemPath>
+    </logicalFolder>
+    <logicalFolder name="ResourceFiles"
+                   displayName="Resource Files"
+                   projectFiles="true">
+    </logicalFolder>
+    <logicalFolder name="SourceFiles"
+                   displayName="Source Files"
+                   projectFiles="true">
+      <itemPath>RHCRC.cpp</itemPath>
+      <itemPath>RHDatagram.cpp</itemPath>
+      <itemPath>RHGenericDriver.cpp</itemPath>
+      <itemPath>RHGenericSPI.cpp</itemPath>
+      <itemPath>RHHardwareSPI.cpp</itemPath>
+      <itemPath>RHNRFSPIDriver.cpp</itemPath>
+      <itemPath>RHReliableDatagram.cpp</itemPath>
+      <itemPath>RHSPIDriver.cpp</itemPath>
+      <itemPath>RH_NRF24.cpp</itemPath>
+      <itemPath>RasPi.cpp</itemPath>
+      <itemPath>main.cpp</itemPath>
+    </logicalFolder>
+    <logicalFolder name="TestFiles"
+                   displayName="Test Files"
+                   projectFiles="false"
+                   kind="TEST_LOGICAL_FOLDER">
+    </logicalFolder>
+    <logicalFolder name="ExternalFiles"
+                   displayName="Important Files"
+                   projectFiles="false"
+                   kind="IMPORTANT_FILES_FOLDER">
+      <itemPath>Makefile</itemPath>
+    </logicalFolder>
+  </logicalFolder>
+  <sourceRootList>
+    <Elem>RadioHead</Elem>
+  </sourceRootList>
+  <projectmakefile>Makefile</projectmakefile>
+  <confs>
+    <conf name="Debug" type="1">
+      <toolsSet>
+        <compilerSet>GNU|GNU</compilerSet>
+        <dependencyChecking>true</dependencyChecking>
+        <rebuildPropChanged>false</rebuildPropChanged>
+      </toolsSet>
+      <compileType>
+        <cTool>
+          <developmentMode>2</developmentMode>
+          <warningLevel>2</warningLevel>
+        </cTool>
+        <ccTool>
+          <developmentMode>2</developmentMode>
+          <standard>11</standard>
+          <preprocessorList>
+            <Elem>RASPBERRY_PI</Elem>
+          </preprocessorList>
+          <warningLevel>2</warningLevel>
+        </ccTool>
+        <asmTool>
+          <warningLevel>2</warningLevel>
+        </asmTool>
+        <linkerTool>
+          <linkerLibItems>
+            <linkerOptionItem>-lwiringPi</linkerOptionItem>
+          </linkerLibItems>
+        </linkerTool>
+      </compileType>
+      <item path="RHCRC.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="RHCRC.h" ex="false" tool="3" flavor2="0">
+      </item>
+      <item path="RHDatagram.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="RHDatagram.h" ex="false" tool="3" flavor2="0">
+      </item>
+      <item path="RHGenericDriver.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="RHGenericDriver.h" ex="false" tool="3" flavor2="0">
+      </item>
+      <item path="RHGenericSPI.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="RHGenericSPI.h" ex="false" tool="3" flavor2="0">
+      </item>
+      <item path="RHHardwareSPI.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="RHHardwareSPI.h" ex="false" tool="3" flavor2="0">
+      </item>
+      <item path="RHNRFSPIDriver.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="RHNRFSPIDriver.h" ex="false" tool="3" flavor2="0">
+      </item>
+      <item path="RHReliableDatagram.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="RHReliableDatagram.h" ex="false" tool="3" flavor2="0">
+      </item>
+      <item path="RHSPIDriver.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="RHSPIDriver.h" ex="false" tool="3" flavor2="0">
+      </item>
+      <item path="RH_NRF24.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="RH_NRF24.h" ex="false" tool="3" flavor2="0">
+      </item>
+      <item path="RadioHead.h" ex="false" tool="3" flavor2="0">
+      </item>
+      <item path="RasPi.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="RasPi.h" ex="false" tool="3" flavor2="0">
+      </item>
+      <item path="main.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+    </conf>
+    <conf name="Release" type="1">
+      <toolsSet>
+        <compilerSet>default</compilerSet>
+        <dependencyChecking>true</dependencyChecking>
+        <rebuildPropChanged>false</rebuildPropChanged>
+      </toolsSet>
+      <compileType>
+        <cTool>
+          <developmentMode>5</developmentMode>
+        </cTool>
+        <ccTool>
+          <developmentMode>5</developmentMode>
+          <standard>11</standard>
+        </ccTool>
+        <fortranCompilerTool>
+          <developmentMode>5</developmentMode>
+        </fortranCompilerTool>
+        <asmTool>
+          <developmentMode>5</developmentMode>
+        </asmTool>
+      </compileType>
+      <item path="RHCRC.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="RHCRC.h" ex="false" tool="3" flavor2="0">
+      </item>
+      <item path="RHDatagram.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="RHDatagram.h" ex="false" tool="3" flavor2="0">
+      </item>
+      <item path="RHGenericDriver.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="RHGenericDriver.h" ex="false" tool="3" flavor2="0">
+      </item>
+      <item path="RHGenericSPI.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="RHGenericSPI.h" ex="false" tool="3" flavor2="0">
+      </item>
+      <item path="RHHardwareSPI.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="RHHardwareSPI.h" ex="false" tool="3" flavor2="0">
+      </item>
+      <item path="RHNRFSPIDriver.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="RHNRFSPIDriver.h" ex="false" tool="3" flavor2="0">
+      </item>
+      <item path="RHReliableDatagram.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="RHReliableDatagram.h" ex="false" tool="3" flavor2="0">
+      </item>
+      <item path="RHSPIDriver.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="RHSPIDriver.h" ex="false" tool="3" flavor2="0">
+      </item>
+      <item path="RH_NRF24.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="RH_NRF24.h" ex="false" tool="3" flavor2="0">
+      </item>
+      <item path="RadioHead.h" ex="false" tool="3" flavor2="0">
+      </item>
+      <item path="RasPi.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+      <item path="RasPi.h" ex="false" tool="3" flavor2="0">
+      </item>
+      <item path="main.cpp" ex="false" tool="1" flavor2="0">
+      </item>
+    </conf>
+  </confs>
+</configurationDescriptor>
