@@ -126,7 +126,7 @@
   </ImportGroup>
   <ProjectExtensions>
     <VisualStudio>
-      <UserProperties VM_ADDITIONAL_COMPILER_CPP_FLAGS="" VM_ADDITIONAL_COMPILER_C_FLAGS="" arduino.upload.port="COM9" VM_ADDITIONAL_COMPILER_FLAGS="-O2 -Wall" />
+      <UserProperties VM_ADDITIONAL_COMPILER_CPP_FLAGS="" VM_ADDITIONAL_COMPILER_C_FLAGS="" arduino.upload.port="COM9" VM_ADDITIONAL_COMPILER_FLAGS="-O2" />
     </VisualStudio>
   </ProjectExtensions>
 </Project>
