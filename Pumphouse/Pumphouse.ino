@@ -1,15 +1,12 @@
-#include <RHReliableDatagram.h>
-#include <RH_NRF24.h>
+
+#include <RF24Network.h>
+#include <RF24.h>
 #include <SPI.h>
+#include <RF24Ethernet.h>
+#include "RF24Mesh.h"
 
 #include <OneWire.h>
 #include <DallasTemperature.h>
-#include "printf.h"
-#include "math.h"
-
-// Sleep functions
-#include <avr/sleep.h>
-#include <avr/power.h>
 
 // Define pin used by temperature sensors
 #define ONE_WIRE_BUS 7
@@ -22,72 +19,74 @@ OneWire oneWire(ONE_WIRE_BUS);
 // Pass our oneWire reference to Dallas Temperature. 
 DallasTemperature sensors(&oneWire);
 
-int numberOfOneWireDevices; // Number of temperature devices found
-
-DeviceAddress tempDeviceAddress; // We'll use this variable to store a found device address
+// Number of temperature devices found
+uint8_t numberOfOneWireDevices;
 
 // Define known device addresses
 DeviceAddress tempSensors[] = { { 0x28, 0xFF, 0xDD ,0x96,  0x36 , 0x16 , 0x03 , 0xB9 } ,{ 0x28,0xB3,0x8E,0x4A,0x07,0x00,0x00,0xA8 } ,{ 0x28,0x0A,0x62,0xB8,0x07,0x00,0x00,0xB4 } };
 
 // Define friendly names for these addresses
-String tempSensorNames[] = { "Lake Water: ", "Outside Air: ", "Inside Pumphouse: " };
+char* tempSensorNames[] = { "Lake Water: ", "Outside Air: ", "Inside Pumphouse: " };
 
 // Keep track of the readings from the devices
 float temperatureReadings[3];
 
-// Singleton instance of the radio driver
-// Use default pinout as they are applicable here
-RH_NRF24 driver;
-// RH_NRF24 driver(8, 7);   // For RFM73 on Anarduino Mini
+// How often to check wireless connection
+#define MESH_CHECK_INTERVAL 15000
 
-#define myAddress 'p'
+// HTTP request/response buffer sizes
+#define INPUT_BUFFER_SIZE 255
+#define OUTPUT_BUFFER_SIZE 255
 
-// Class to manage message delivery and receipt, using the driver declared above
-RHReliableDatagram manager(driver, myAddress);
+// Initialize radio on pins 8 & 10 for CE and CS respectively
+RF24 radio(8, 10);
+// Define network, mesh, and IP layers
+RF24Network network(radio);
+RF24Mesh mesh(radio, network);
+RF24EthernetClass RF24Ethernet(radio, network, mesh);
+// Set server to run on port 1000
+EthernetServer server = EthernetServer(1000);
 
-#define DATAGRAM_TIMEOUT  1000
-#define RF_CHANNEL  40
-#define NUM_RETRIES 3
+// Timer used to check wireless connection status
+uint32_t mesh_timer = 0;
 
-// Payload definition
-struct payload {
-	uint8_t response;
-	char type;
-	char id;
-	float value;
-};
+// Pin on which an LED is connected so we can output connectivity status
+#define LED_PIN 4
 
-// A flag to indicate we received a message
-volatile bool messageWaiting;
 
 /********************** Setup *********************/
-
 void setup() {
 
-	// Set available message flag to 0 on startup
-	messageWaiting = false;
-
 	Serial.begin(115200);
-	// Allow debug printing to serial
-	printf_begin();
+
+	// Set our friendly "has connection" led to off
+	pinMode(LED_PIN, OUTPUT);
+	digitalWrite(LED_PIN, LOW);
 
 	Serial.print(F("Initializing radio..."));
 
-	// Setup and configure rf radio
-	if (!manager.init()) {
-		Serial.println(F("Radio init failed"));
-		return;
+	// Set the IP address we'll be using. The last octet of the IP must be equal
+	// to the designated mesh nodeID
+	IPAddress myIP(10, 10, 2, 20);
+	Ethernet.begin(myIP);
+	mesh.setNodeID(20);
+
+	// Init mesh
+	if (!mesh.begin()) {
+		Serial.println(F("Error: unable to intialize mesh; retrying..."));
+		// If fail, retry...
+		setup();
+	}
+	else {
+		// If we're good, light up LED
+		digitalWrite(LED_PIN, HIGH);
 	}
 
-	// Max power level
-	driver.setRF(RH_NRF24::DataRate250kbps, RH_NRF24::TransmitPower0dBm);
-
-	// Random channel
-	driver.setChannel(RF_CHANNEL);
-
-	//manager.setTimeout(DATAGRAM_TIMEOUT);
-
-	//manager.setRetries(NUM_RETRIES);
+	//Set IP of the RPi (gateway)
+	IPAddress gwIP(10, 10, 2, 1);
+	Ethernet.set_gateway(gwIP);
+	// Init server
+	server.begin();
 
 	Serial.println(F("done."));
 	Serial.println(F("Intializing temperature sensors..."));
@@ -102,13 +101,10 @@ void setup() {
 	Serial.print(numberOfOneWireDevices, DEC);
 	Serial.println(F(" OneWire devices."));
 
-	Serial.print(F("Parasite power is: "));
-	if (sensors.isParasitePowerMode()) Serial.println(F("ON"));
-	else Serial.println(F("OFF"));
-
 	// Loop through each device, print out address
 	for (int i = 0; i < numberOfOneWireDevices; i++)
 	{
+		DeviceAddress tempDeviceAddress;
 		// Search the wire for address
 		if (sensors.getAddress(tempDeviceAddress, i))
 		{
@@ -118,15 +114,16 @@ void setup() {
 			printAddress(tempDeviceAddress);
 			Serial.println();
 
-			Serial.print(F("Setting resolution to "));
-			Serial.println(TEMPERATURE_PRECISION, DEC);
-
 			// set the resolution to TEMPERATURE_PRECISION bit (Each Dallas/Maxim device is capable of several different resolutions)
 			sensors.setResolution(tempDeviceAddress, TEMPERATURE_PRECISION);
+			uint8_t actual_set = sensors.getResolution(tempDeviceAddress);
+			if (actual_set != TEMPERATURE_PRECISION) {
+				Serial.print(F("Error in setting temp precision; requested"));
+				Serial.print(TEMPERATURE_PRECISION, DEC);
+				Serial.print(" but received ");
+				Serial.println(actual_set, DEC);
+			}
 
-			Serial.print(F("Resolution actually set to: "));
-			Serial.print(sensors.getResolution(tempDeviceAddress), DEC);
-			Serial.println();
 		}
 		else {
 			Serial.print(F("Found ghost device at "));
@@ -148,8 +145,8 @@ void printAddress(DeviceAddress deviceAddress)
 }
 
 
-// Prints the temperature of all devices and saves to RAM
-void printAndSaveTemperature(uint8_t sensorId)
+// Saves temperature of a device to RAM
+void saveTemperature(uint8_t sensorId)
 {
 	// Make sure sensor is connected
 	if (sensors.isConnected(tempSensors[sensorId])) {
@@ -159,9 +156,9 @@ void printAndSaveTemperature(uint8_t sensorId)
 			tempC += 0.9;
 		}
 		temperatureReadings[sensorId] = tempC;
-		Serial.print(tempSensorNames[sensorId]);
-		Serial.print(tempC);
-		Serial.println(F(" C"));
+		//Serial.print(tempSensorNames[sensorId]);
+		//Serial.print(tempC);
+		//Serial.println(F(" C"));
 	}
 	else {
 		Serial.print(F("Error: unable to communicate with sensor "));
@@ -170,152 +167,109 @@ void printAndSaveTemperature(uint8_t sensorId)
 
 }
 
-// Sleep function
-void enterSleep(void)
-{
-	Serial.println(F("Entering sleep..."));
-
-	// Delay a bit to finish dealing with any remaining tasks like printing serial data
-	delay(100);
-
-	set_sleep_mode(SLEEP_MODE_PWR_DOWN);
-
-	sleep_enable();
-
-	sleep_mode();
-
-	/* The program will continue from here. */
-
-	/* First thing to do is disable sleep. */
-	sleep_disable();
-
-	Serial.println(F("Leaving sleep..."));
-}
-
-
 /********************** Main Loop *********************/
 void loop() {
 
+	// Every MESH_CHECK_INTERVAL, check mesh connection
+	if (millis() - mesh_timer > MESH_CHECK_INTERVAL) {
+		mesh_timer = millis();
+		if (!mesh.checkConnection()) {
+			// If fail, indicate with LED and renew
+			digitalWrite(LED_PIN, LOW);
+			mesh.renewAddress();
+			digitalWrite(LED_PIN, HIGH);
+		}
+		else {
+			digitalWrite(LED_PIN, HIGH);
+		}
+	}
 
-	// Execute if there is a pending message to process
-	if (manager.available()) {
+	// If message available (that is, a TCP connection to our server port)
+	if (EthernetClient client = server.available())
+	{
+		bool transmit = false;
+		bool evalInput = true;
 
-		Serial.println(F("Processing received message."));
+		// Define buffer and index to it
+		int idx = 0;
+		char buf[INPUT_BUFFER_SIZE];
 
-		// Wait for a message addressed to us from the client
-		
-		uint8_t from;
-		payload recv_msg;
-		uint8_t len = sizeof(recv_msg);
-
-		if (manager.recvfromAck((uint8_t *)&recv_msg, &len, &from))
-		{
-			Serial.print(F("Got message from : 0x"));
-			Serial.print(from, HEX);
-			Serial.print(F(" | id:"));
-
-			Serial.print(recv_msg.id);
-			Serial.print(F(" | Resp:"));
-			Serial.print(recv_msg.response);
-			Serial.print(F(" | Type:"));
-			Serial.println(recv_msg.type);
-
-			Serial.print(F("Requesting temperatures..."));
-			sensors.requestTemperatures(); // Send the command to get temperatures
-			Serial.println(F("done."));
-
-			Serial.println(F("Temperatures:"));
-
-			// Print and save all the temperatures
-			for (int i = 0; i < numberOfOneWireDevices; i++) {
-				printAndSaveTemperature(i);
+		// Read data from client
+		while (int dataToRead = client.waitAvailable() > 0) {
+			// When reading data, make sure to only read appropriate amount to avoid buffer overflow
+			if (dataToRead <= INPUT_BUFFER_SIZE - idx) {
+				idx += client.read((uint8_t*)&buf + idx, dataToRead);
 			}
-
-
-			// Define sending payload
-			payload send_msg;
-
-			// If the message requests a temperature reading...
-			if (recv_msg.response == 0 && recv_msg.type == 'T') {
-
-				Serial.println(F("Responding..."));
-
-				// Set type to response, of type temp
-				send_msg.response = 1;
-				send_msg.type = 'T';
-
-				// Send lake, outside and inside temperature readings in succession
-				send_msg.value = temperatureReadings[0];
-				send_msg.id = 'L';
-
-				bool res = manager.sendtoWait((uint8_t *)&send_msg, sizeof(send_msg), from);
-
-				send_msg.value = temperatureReadings[1];
-				send_msg.id = 'O';
-
-				res &= manager.sendtoWait((uint8_t *)&send_msg, sizeof(send_msg), from);
-
-				send_msg.value = temperatureReadings[2];
-				send_msg.id = 'I';
-
-				res &= manager.sendtoWait((uint8_t *)&send_msg, sizeof(send_msg), from);
-
-				if (!res) {
-					Serial.println(F("Error sending response(s)"));
-				}
-
-			}
-
-			// Otherwise send an error message as we are not expecting other message types
 			else {
-				send_msg.response = 1;
-				send_msg.type = recv_msg.type;
-				send_msg.id = 'Z';
-				send_msg.value = NAN;
+				evalInput = false;
+				break;
+			}
+		}
 
-				if (!manager.sendtoWait((uint8_t *)&send_msg, sizeof(send_msg), from)) {
-					Serial.println(F("Error sending response(s)"));
+		// Clear out anything left
+		// Seems sometimes if it is not cleared transmitting can have problems
+		client.flush();
+
+		if (evalInput) {
+			// Search for a GET request
+			char* gettype = strstr(buf, "GET");
+
+			// If GET request
+			if (gettype != NULL) {
+				// Split by space (twice)
+				strsep(&gettype, " ");
+				char* addr = strsep(&gettype, " ");
+				// After splitting, check the requested file: must be /temp
+				if (strcmp(addr, "/temp") == 0) {
+					// All OK: transmit
+					transmit = true;
 				}
 			}
+		}
 
+
+		if (transmit) {
+			// Tell all sensors to update temperatures
+			sensors.requestTemperatures();
+
+			Serial.println(F("Temperature request received; responding..."));
+
+			// Define output buffer incl. HTTP response header
+			char bufT[OUTPUT_BUFFER_SIZE] = "HTTP/1.1 200 OK \r\nContent-Type: text/plain \r\nConnection: close \r\nRefresh: 5 \r\n\r\n";
+
+			// Go through all sensors and send
+			for (uint8_t i = 0; i < numberOfOneWireDevices; i++) {
+				// Update temperature arrray
+				saveTemperature(i);
+
+				// Add sensor name to response
+				strcat(bufT, tempSensorNames[i]);
+
+				// Convert temp float to string and save to buffer
+				char fltStr[10];
+				dtostrf(temperatureReadings[i], 0, 5, fltStr);
+
+				strcat(bufT, fltStr);
+
+				// Add a | if necessary (i.e. more sensors to follow)
+				if (i < numberOfOneWireDevices - 1) {
+					strcat(bufT, "|");
+				}
+
+			}
+			// Add final line ending
+			strcat(bufT, "\r\n");
+			// Send to client
+			client.write(bufT, strlen(bufT));
+			// Close connection
+			client.stop();
 
 		}
 		else {
-			Serial.println(F("Error: recvFromAck"));
+			// Anything went wrong, respond with simple bad request
+			client.write("HTTP/1.1 400 Bad Request \r\n\r\n");
+			client.stop();
 		}
-
-
 	}
 
-	// Power down the CPU to save power
-	delay(100);
-
-	//enterSleep();
-
 }
-
-
-/********************** Interrupt *********************/
-
-//void check_radio(void)
-//{
-//	Serial.println(F("Checking radio..."));
-//
-//	bool tx, fail, rx;
-//	radio.whatHappened(tx, fail, rx);                     // What happened?
-//
-//	if (tx) {                                         // Have we successfully transmitted?
-//		Serial.println(F("Payload:Sent"));
-//	}
-//
-//	if (fail) {                                       // Have we failed to transmit?
-//		Serial.println(F("Payload:Failed"));
-//		if (radio.failureDetected) Serial.println("Radio failure.");
-//	}
-//
-//	if (rx || radio.available()) {                      // Did we receive a message?
-//		Serial.println(F("Message received."));
-//		messageWaiting = true;
-//
-//	}
-//}

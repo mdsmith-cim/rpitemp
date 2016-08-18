@@ -1,38 +1,18 @@
-/*
-        TMRh20 2014 - Optimized RF24 Library Fork
- */
-
-/**
- * Example using Dynamic Payloads
- *
- * This is an example of how to use payloads of a varying (dynamic) size.
- */
-
 #include <cstdlib>
 #include <iostream>
 #include <sstream>
 #include <stdlib.h>
 #include <string>
-#include "RHReliableDatagram.h"
-#include "RH_NRF24.h"
-#include "wiringPi.h"
 #include <signal.h>
 
 using namespace std;
 
-#define DATAGRAM_TIMEOUT  1000
-#define RF_CHANNEL  40
-#define NUM_RETRIES 3
-
-#define MY_ADDRESS 'c'
-#define PUMP_ADDRESS 'p'
+#define RF_CHANNEL 40
 
 #define CE_PIN 16
-#define CS_PIN 18
+#define CS_PIN 1*10+0 // /dev/spidev1.0
 
-RH_NRF24 driver(CE_PIN, CS_PIN);
-RHReliableDatagram manager(driver, MY_ADDRESS);
-
+RF24 radio(16, CS_PIN); 
 uint8_t num_packets_expected;
 // Payload definition
 
