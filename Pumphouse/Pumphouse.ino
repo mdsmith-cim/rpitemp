@@ -72,7 +72,7 @@ void setup() {
 	mesh.setNodeID(20);
 
 	// Init mesh
-	if (!mesh.begin()) {
+	if (!mesh.begin((uint8_t)97, RF24_250KBPS)) {
 		Serial.println(F("Error: unable to intialize mesh; retrying..."));
 		// If fail, retry...
 		setup();
@@ -152,9 +152,9 @@ void saveTemperature(uint8_t sensorId)
 	if (sensors.isConnected(tempSensors[sensorId])) {
 		float tempC = sensors.getTempC(tempSensors[sensorId]);
 		// Correct the lake temperature sensor a bit
-		if (sensorId == 0) {
+		/*if (sensorId == 0) {
 			tempC += 0.9;
-		}
+		}*/
 		temperatureReadings[sensorId] = tempC;
 		//Serial.print(tempSensorNames[sensorId]);
 		//Serial.print(tempC);
