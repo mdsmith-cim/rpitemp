@@ -39,5 +39,4 @@ C:\Users\Michael\AppData\Local\Temp\VMicroBuilds\Pumphouse\uno\Pumphouse.cpp.o: 
  C:\Users\Michael\Documents\Arduino\libraries\RF24Ethernet/RF24Server.h \
  C:\Program\ Files\ (x86)\Arduino\hardware\arduino\avr\cores\arduino/Server.h \
  C:\Users\Michael\Documents\Arduino\libraries\OneWire/OneWire.h \
- C:\Users\Michael\Documents\Arduino\libraries\DallasTemperature/DallasTemperature.h \
- C:\Users\Michael\Documents\Arduino\libraries\RF24/printf.h
+ C:\Users\Michael\Documents\Arduino\libraries\DallasTemperature/DallasTemperature.h

@@ -35,16 +35,6 @@ OBJECTDIR=${CND_BUILDDIR}/${CND_CONF}/${CND_PLATFORM}
 
 # Object Files
 OBJECTFILES= \
-	${OBJECTDIR}/RHCRC.o \
-	${OBJECTDIR}/RHDatagram.o \
-	${OBJECTDIR}/RHGenericDriver.o \
-	${OBJECTDIR}/RHGenericSPI.o \
-	${OBJECTDIR}/RHHardwareSPI.o \
-	${OBJECTDIR}/RHNRFSPIDriver.o \
-	${OBJECTDIR}/RHReliableDatagram.o \
-	${OBJECTDIR}/RHSPIDriver.o \
-	${OBJECTDIR}/RH_NRF24.o \
-	${OBJECTDIR}/RasPi.o \
 	${OBJECTDIR}/main.o
 
 
@@ -71,56 +61,6 @@ LDLIBSOPTIONS=
 ${CND_DISTDIR}/${CND_CONF}/${CND_PLATFORM}/rpi_sensor_master: ${OBJECTFILES}
 	${MKDIR} -p ${CND_DISTDIR}/${CND_CONF}/${CND_PLATFORM}
 	${LINK.cc} -o ${CND_DISTDIR}/${CND_CONF}/${CND_PLATFORM}/rpi_sensor_master ${OBJECTFILES} ${LDLIBSOPTIONS}
-
-${OBJECTDIR}/RHCRC.o: RHCRC.cpp 
-	${MKDIR} -p ${OBJECTDIR}
-	${RM} "$@.d"
-	$(COMPILE.cc) -O2 -std=c++14 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/RHCRC.o RHCRC.cpp
-
-${OBJECTDIR}/RHDatagram.o: RHDatagram.cpp 
-	${MKDIR} -p ${OBJECTDIR}
-	${RM} "$@.d"
-	$(COMPILE.cc) -O2 -std=c++14 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/RHDatagram.o RHDatagram.cpp
-
-${OBJECTDIR}/RHGenericDriver.o: RHGenericDriver.cpp 
-	${MKDIR} -p ${OBJECTDIR}
-	${RM} "$@.d"
-	$(COMPILE.cc) -O2 -std=c++14 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/RHGenericDriver.o RHGenericDriver.cpp
-
-${OBJECTDIR}/RHGenericSPI.o: RHGenericSPI.cpp 
-	${MKDIR} -p ${OBJECTDIR}
-	${RM} "$@.d"
-	$(COMPILE.cc) -O2 -std=c++14 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/RHGenericSPI.o RHGenericSPI.cpp
-
-${OBJECTDIR}/RHHardwareSPI.o: RHHardwareSPI.cpp 
-	${MKDIR} -p ${OBJECTDIR}
-	${RM} "$@.d"
-	$(COMPILE.cc) -O2 -std=c++14 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/RHHardwareSPI.o RHHardwareSPI.cpp
-
-${OBJECTDIR}/RHNRFSPIDriver.o: RHNRFSPIDriver.cpp 
-	${MKDIR} -p ${OBJECTDIR}
-	${RM} "$@.d"
-	$(COMPILE.cc) -O2 -std=c++14 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/RHNRFSPIDriver.o RHNRFSPIDriver.cpp
-
-${OBJECTDIR}/RHReliableDatagram.o: RHReliableDatagram.cpp 
-	${MKDIR} -p ${OBJECTDIR}
-	${RM} "$@.d"
-	$(COMPILE.cc) -O2 -std=c++14 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/RHReliableDatagram.o RHReliableDatagram.cpp
-
-${OBJECTDIR}/RHSPIDriver.o: RHSPIDriver.cpp 
-	${MKDIR} -p ${OBJECTDIR}
-	${RM} "$@.d"
-	$(COMPILE.cc) -O2 -std=c++14 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/RHSPIDriver.o RHSPIDriver.cpp
-
-${OBJECTDIR}/RH_NRF24.o: RH_NRF24.cpp 
-	${MKDIR} -p ${OBJECTDIR}
-	${RM} "$@.d"
-	$(COMPILE.cc) -O2 -std=c++14 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/RH_NRF24.o RH_NRF24.cpp
-
-${OBJECTDIR}/RasPi.o: RasPi.cpp 
-	${MKDIR} -p ${OBJECTDIR}
-	${RM} "$@.d"
-	$(COMPILE.cc) -O2 -std=c++14 -MMD -MP -MF "$@.d" -o ${OBJECTDIR}/RasPi.o RasPi.cpp
 
 ${OBJECTDIR}/main.o: main.cpp 
 	${MKDIR} -p ${OBJECTDIR}

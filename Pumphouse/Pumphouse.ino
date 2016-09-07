@@ -1,12 +1,16 @@
-
+// Wireless transmission/protocol stuff
 #include <RF24Network.h>
 #include <RF24.h>
 #include <SPI.h>
 #include <RF24Ethernet.h>
 #include "RF24Mesh.h"
 
+// Temp sensors
 #include <OneWire.h>
 #include <DallasTemperature.h>
+
+// Watchdog
+#include <avr/wdt.h>
 
 // Define pin used by temperature sensors
 #define ONE_WIRE_BUS 7
@@ -26,7 +30,7 @@ uint8_t numberOfOneWireDevices;
 DeviceAddress tempSensors[] = { { 0x28, 0xFF, 0xDD ,0x96,  0x36 , 0x16 , 0x03 , 0xB9 } ,{ 0x28,0xB3,0x8E,0x4A,0x07,0x00,0x00,0xA8 } ,{ 0x28,0x0A,0x62,0xB8,0x07,0x00,0x00,0xB4 } };
 
 // Define friendly names for these addresses
-char* tempSensorNames[] = { "Lake Water: ", "Outside Air: ", "Inside Pumphouse: " };
+char* tempSensorNames[] = { "Lake Water: ", "Outside Air: ", "Intake Pipe: " };
 
 // Keep track of the readings from the devices
 float temperatureReadings[3];
@@ -35,8 +39,7 @@ float temperatureReadings[3];
 #define MESH_CHECK_INTERVAL 15000
 
 // HTTP request/response buffer sizes
-#define INPUT_BUFFER_SIZE 255
-#define OUTPUT_BUFFER_SIZE 255
+#define HTTP_BUFFER_SIZE 400
 
 // Initialize radio on pins 8 & 10 for CE and CS respectively
 RF24 radio(8, 10);
@@ -53,15 +56,20 @@ uint32_t mesh_timer = 0;
 // Pin on which an LED is connected so we can output connectivity status
 #define LED_PIN 4
 
+// Define error types
+enum error {ERR_UNKNOWN, ERR_BUF_OVERFLOW, ERROR_NOT_TEMP_REQ, ERROR_NOT_GET_REQ};
 
 /********************** Setup *********************/
 void setup() {
 
-	Serial.begin(115200);
+	// In setup, disable WDT as sometimes things like initializing the radio may take a while
+	wdt_disable();
 
 	// Set our friendly "has connection" led to off
 	pinMode(LED_PIN, OUTPUT);
 	digitalWrite(LED_PIN, LOW);
+
+	Serial.begin(115200);
 
 	Serial.print(F("Initializing radio..."));
 
@@ -74,8 +82,9 @@ void setup() {
 	// Init mesh
 	if (!mesh.begin((uint8_t)97, RF24_250KBPS)) {
 		Serial.println(F("Error: unable to intialize mesh; retrying..."));
-		// If fail, retry...
-		setup();
+		// If it fails, force reset arduino using watchdog -> enable w/ interval 0.5S, wait 1s
+		wdt_enable(WDTO_500MS);
+		delay(1000);
 	}
 	else {
 		// If we're good, light up LED
@@ -102,7 +111,7 @@ void setup() {
 	Serial.println(F(" OneWire devices."));
 
 	// Loop through each device, print out address
-	for (int i = 0; i < numberOfOneWireDevices; i++)
+	for (uint8_t i = 0; i < numberOfOneWireDevices; i++)
 	{
 		DeviceAddress tempDeviceAddress;
 		// Search the wire for address
@@ -131,6 +140,9 @@ void setup() {
 			Serial.println(F(" but could not detect address. Check power and cabling"));
 		}
 	}
+
+	// Setup done, enable watchdog
+	wdt_enable(WDTO_8S);
 }
 
 
@@ -151,10 +163,10 @@ void saveTemperature(uint8_t sensorId)
 	// Make sure sensor is connected
 	if (sensors.isConnected(tempSensors[sensorId])) {
 		float tempC = sensors.getTempC(tempSensors[sensorId]);
-		// Correct the lake temperature sensor a bit
-		/*if (sensorId == 0) {
-			tempC += 0.9;
-		}*/
+		// Correct the inside temperature sensor a bit
+		if (sensorId == 2) {
+			tempC -= 0.9375;
+		}
 		temperatureReadings[sensorId] = tempC;
 		//Serial.print(tempSensorNames[sensorId]);
 		//Serial.print(tempC);
@@ -169,7 +181,7 @@ void saveTemperature(uint8_t sensorId)
 
 /********************** Main Loop *********************/
 void loop() {
-
+	
 	// Every MESH_CHECK_INTERVAL, check mesh connection
 	if (millis() - mesh_timer > MESH_CHECK_INTERVAL) {
 		mesh_timer = millis();
@@ -189,19 +201,22 @@ void loop() {
 	{
 		bool transmit = false;
 		bool evalInput = true;
+		// Use error type to formulate appropriate response
+		error error_type = ERR_UNKNOWN;
 
 		// Define buffer and index to it
 		int idx = 0;
-		char buf[INPUT_BUFFER_SIZE];
+		char buf[HTTP_BUFFER_SIZE];
 
 		// Read data from client
 		while (int dataToRead = client.waitAvailable() > 0) {
 			// When reading data, make sure to only read appropriate amount to avoid buffer overflow
-			if (dataToRead <= INPUT_BUFFER_SIZE - idx) {
+			if (dataToRead <= HTTP_BUFFER_SIZE - idx) {
 				idx += client.read((uint8_t*)&buf + idx, dataToRead);
 			}
 			else {
 				evalInput = false;
+				error_type = ERR_BUF_OVERFLOW;
 				break;
 			}
 		}
@@ -224,6 +239,12 @@ void loop() {
 					// All OK: transmit
 					transmit = true;
 				}
+				else {
+					error_type = ERROR_NOT_TEMP_REQ;
+				}
+			}
+			else {
+				error_type = ERROR_NOT_GET_REQ;
 			}
 		}
 
@@ -235,7 +256,8 @@ void loop() {
 			Serial.println(F("Temperature request received; responding..."));
 
 			// Define output buffer incl. HTTP response header
-			char bufT[OUTPUT_BUFFER_SIZE] = "HTTP/1.1 200 OK \r\nContent-Type: text/plain \r\nConnection: close \r\nRefresh: 5 \r\n\r\n";
+			// Overwrite input buffer since we don't need it anymore
+			strcpy(buf, "HTTP/1.1 200 OK \r\nContent-Type: text/plain \r\nConnection: close \r\nRefresh: 5 \r\n\r\n");
 
 			// Go through all sensors and send
 			for (uint8_t i = 0; i < numberOfOneWireDevices; i++) {
@@ -243,33 +265,51 @@ void loop() {
 				saveTemperature(i);
 
 				// Add sensor name to response
-				strcat(bufT, tempSensorNames[i]);
+				strcat(buf, tempSensorNames[i]);
 
 				// Convert temp float to string and save to buffer
 				char fltStr[10];
 				dtostrf(temperatureReadings[i], 0, 5, fltStr);
 
-				strcat(bufT, fltStr);
+				strcat(buf, fltStr);
 
 				// Add a | if necessary (i.e. more sensors to follow)
 				if (i < numberOfOneWireDevices - 1) {
-					strcat(bufT, "|");
+					strcat(buf, "|");
 				}
 
 			}
 			// Add final line ending
-			strcat(bufT, "\r\n");
+			strcat(buf, "\r\n");
 			// Send to client
-			client.write(bufT, strlen(bufT));
+			client.write(buf, strlen(buf));
 			// Close connection
 			client.stop();
 
 		}
 		else {
-			// Anything went wrong, respond with simple bad request
-			client.write("HTTP/1.1 400 Bad Request \r\n\r\n");
+			//Error: respond with appropriate message
+			switch ( error_type)
+			{
+			case ERR_BUF_OVERFLOW:
+				client.write("HTTP/1.1 431 Request Header Fields Too Large \r\n\r\n");
+				break;
+			case ERROR_NOT_GET_REQ:
+				client.write("HTTP/1.1 405 Method Not Allowed \r\n\r\n");
+				break;
+			case ERROR_NOT_TEMP_REQ:
+				client.write("HTTP/1.1 501 Not Implemented \r\n\r\nOnly temperature(/temp) requests supported.\r\n");
+				break;
+			case ERR_UNKNOWN:
+			default:
+				client.write("HTTP/1.1 520 Unknown Error \r\n\r\n");
+				break;
+			}
 			client.stop();
 		}
 	}
+
+	// If our loop continues executing (and no readio failure), tell watchdog we're OK
+	if (!radio.failureDetected) wdt_reset();
 
 }
