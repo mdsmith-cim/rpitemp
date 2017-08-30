@@ -1,5 +1,8 @@
 #include <Arduino.h>
+#include <WiFiUdp.h>
+#include <ArduinoOTA.h>
 #include <ESP8266WiFi.h>
+#include <ESP8266mDNS.h>
 #include <WiFiClient.h>
 #include <ESP8266WebServer.h>
 #include <Adafruit_MLX90614.h>
@@ -18,6 +21,7 @@
 // Wifi info
 const char* ssid = "Sensor Net";
 const char* password = "HBqSKtfrOUejsrXAM0GQkHiC";
+const char* otaPassword = "updateESP8266Sensor";
 
 // Create basic HTTP server
 ESP8266WebServer server(HTTP_PORT);
@@ -39,19 +43,29 @@ const DeviceAddress outsideTemp = {0x28, 0xB3, 0x8E, 0x4A, 0x07, 0x00, 0x00, 0xA
 
 // Variables to track button push
 unsigned long last_button_press;
-boolean volatile dispMLX;
+int volatile dispMLX;
 
 unsigned long volatile lastLCDTempDisplay; 
 
-
+// Create a basic UTF-8 HTML page including header and footer
+String basicHTMLResponse(String title, String content) {
+  String response = "<!doctype html><html><head><title>" + title + "</title><meta charset=\"utf-8\" /><meta http-equiv=\"Content-type\" content=\"text/html; charset=utf-8\" /></head><body>";
+  response += (content + "</body></html>\r\n");
+  return response;
+}
 
 // HTTP / request
 void handleRoot() {
-  server.send(200, "text/plain", "Server running...");
+  String content = "Server is running.<br>";
+  content += "<a href=\"temp\">Temperature page</a><br>";
+  content += "IP Address: " + WiFi.localIP().toString() + "<br>";
+  content += "SSID: " + WiFi.SSID() + "<br>";
+
+  server.send(200, "text/html", basicHTMLResponse("Index", content));
 }
 
 void handleNotFound(){
-  String message = "File Not Found\n\n";
+  String message = "Not Found\n\n";
   message += "URI: ";
   message += server.uri();
   message += "\nMethod: ";
@@ -73,19 +87,17 @@ void handleTempRequest() {
   float tempPump = sensors.getTempC(pumpIntake);
   float tempOutside = sensors.getTempC(outsideTemp);
 
-  String response = "<!doctype html>\r\n<html>\r\n<head>\r\n<title>Temperatures</title>\r\n<meta charset=\"utf-8\" />\r\n<meta http-equiv=\"Content-type\" content=\"text/html; charset=utf-8\" />\r\n</head>\r\n<body>";
-  response += "Temperatures:<br>";
-  response += "Ambient outdoor: ";
-  response += String(ambTemp) + " °C<br>";
-  response += "Lake: ";
-  response += String(objectTemp) + " °C<br>";
-  response += "Pump intake: ";
-  response += String(tempPump) + " °C<br>";
-  response += "Outside: ";
-  response += String(tempOutside) + " °C<br>";
-  response += "</body>\r\n</html>\r\n";
+  String content = "<b>Temperatures:</b><br><br>";
+  content += "Ambient outdoor: ";
+  content += String(ambTemp) + " °C<br>";
+  content += "Lake: ";
+  content += String(objectTemp) + " °C<br>";
+  content += "Pump intake: ";
+  content += String(tempPump) + " °C<br>";
+  content += "Outside: ";
+  content += String(tempOutside) + " °C<br>";
 
-  server.send(200, "text/html", response);
+  server.send(200, "text/html", basicHTMLResponse("Temperatures", content));
 
 }
 
@@ -115,6 +127,13 @@ void setupLCDDS18(void) {
   lcd.print("Pmp: ");
 }
 
+// Initialize LCD to show WiFi info
+void setupLCDWiFi(void) {
+  lcd.clear();
+  lcd.setCursor(0,1);
+  lcd.print("Connected? ");
+}
+
 // ISR to handle button pushes (FLSH button)
 void handleButton(void) {
   // Use time to avoid duplicate presses
@@ -122,13 +141,20 @@ void handleButton(void) {
   if (curTime - last_button_press > BUTTON_DEBOUNCE_TIME)
   {
     last_button_press = curTime;
-    dispMLX = !dispMLX;
+    dispMLX = (dispMLX + 1) % 3;
 
-    if (dispMLX) {
+    if (dispMLX == 0) {
       setupLCDMLX();
     }
-    else {
+    else if (dispMLX == 1) {
       setupLCDDS18();
+    }
+    else if (dispMLX == 2) {
+      setupLCDWiFi();
+    }
+    // Somehow (impossibly) the variable entered a weird state; reset it
+    else {
+      dispMLX = 0;
     }
 
     // Force temp update
@@ -206,7 +232,33 @@ void setup(void){
   server.begin();
   Serial.println("HTTP server started");
 
-  Serial.println();
+  Serial.println("Setting up OTA update...");
+
+  //Setup OTA update
+  ArduinoOTA.setPort(8289);
+
+  ArduinoOTA.setPassword(otaPassword);
+
+  ArduinoOTA.onStart([]() {
+    Serial.println("Starting update...");
+  });
+  ArduinoOTA.onEnd([]() {
+    Serial.println("\nUpdate finished.");
+  });
+  ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
+    Serial.printf("Progress: %u%%\r", (progress / (total / 100)));
+  });
+  ArduinoOTA.onError([](ota_error_t error) {
+    Serial.printf("Error[%u]: ", error);
+    if (error == OTA_AUTH_ERROR) Serial.println("Auth Failed");
+    else if (error == OTA_BEGIN_ERROR) Serial.println("Begin Failed");
+    else if (error == OTA_CONNECT_ERROR) Serial.println("Connect Failed");
+    else if (error == OTA_RECEIVE_ERROR) Serial.println("Receive Failed");
+    else if (error == OTA_END_ERROR) Serial.println("End Failed");
+  });
+  ArduinoOTA.begin();
+
+  Serial.println("Setup complete.");
 }
 
 void loop(void){
@@ -242,7 +294,7 @@ void loop(void){
     Serial.print(objectTemp); 
     Serial.println("°C ");
   
-    if (dispMLX) {
+    if (dispMLX == 0) {
       lcd.setCursor(5,0);
       lcd.print(objectTemp);
       lcd.print((char)223);
@@ -253,7 +305,7 @@ void loop(void){
       lcd.print((char)223);
       lcd.print("C    ");
     }
-    else {
+    else if (dispMLX == 1) {
       lcd.setCursor(5,0);
       lcd.print(tempOutside);
       lcd.print((char)223);
@@ -264,6 +316,16 @@ void loop(void){
       lcd.print((char)223);
       lcd.print("C    ");
     }
+    else if (dispMLX == 2) {
+      lcd.setCursor(0,0);
+      lcd.print(WiFi.localIP());
+      
+      lcd.setCursor(11,1);
+      lcd.print(WiFi.isConnected() ? "True" : "False");
+    }
   }
+
+  // Handle update requests
+  ArduinoOTA.handle();
 }
 
