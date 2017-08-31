@@ -17,6 +17,7 @@
 #define LCD_ADDR 0x3F
 #define BUTTON_DEBOUNCE_TIME 500 //ms
 #define TEMP_LCD_POLL 10000 //ms
+#define LCD_CHANGE 30000 //ms
 
 // Wifi info
 const char* ssid = "Sensor Net";
@@ -46,6 +47,7 @@ unsigned long last_button_press;
 int volatile dispMLX;
 
 unsigned long volatile lastLCDTempDisplay; 
+unsigned long volatile lastLCDChange;
 
 // Create a basic UTF-8 HTML page including header and footer
 String basicHTMLResponse(String title, String content) {
@@ -141,6 +143,7 @@ void handleButton(void) {
   if (curTime - last_button_press > BUTTON_DEBOUNCE_TIME)
   {
     last_button_press = curTime;
+    lastLCDChange = curTime;
     dispMLX = (dispMLX + 1) % 3;
 
     if (dispMLX == 0) {
@@ -165,7 +168,7 @@ void handleButton(void) {
 void setup(void){
 
   // Setup ISR for button and related variables
-  dispMLX = true;
+  dispMLX = 0;
   last_button_press = 0;
   pinMode(BUTTON_PIN, INPUT);
   attachInterrupt(BUTTON_PIN, handleButton, FALLING);
@@ -268,8 +271,12 @@ void loop(void){
 
   unsigned long curTime = millis();
 
+  // Simulate button press if certain time elapsed
+  if (curTime - lastLCDChange > LCD_CHANGE) {
+    handleButton();
+  }
   // Update temps on LCD if certain time has elapsed
-  if (curTime - lastLCDTempDisplay > TEMP_LCD_POLL) {
+  else if (curTime - lastLCDTempDisplay > TEMP_LCD_POLL) {
     
     lastLCDTempDisplay = curTime;
 
