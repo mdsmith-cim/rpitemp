@@ -19,6 +19,8 @@
 #define TEMP_LCD_POLL 10000 //ms
 #define LCD_CHANGE 30000 //ms
 
+const char* HTML_BR = "<br>";
+
 // Wifi info
 const char* ssid = "Sensor Net";
 const char* password = "HBqSKtfrOUejsrXAM0GQkHiC";
@@ -60,10 +62,23 @@ String basicHTMLResponse(String title, String content) {
 void handleRoot() {
   String content = "Server is running.<br>";
   content += "<a href=\"temp\">Temperature page</a><br>";
-  content += "IP Address: " + WiFi.localIP().toString() + "<br>";
-  content += "SSID: " + WiFi.SSID() + "<br>";
+  content += "<a href=\"diag\">Diagnostics page</a><br>";
 
   server.send(200, "text/html", basicHTMLResponse("Index", content));
+}
+
+void handleDiag() {
+  String content = "<b>Dianostic WiFi Info</b><br>";
+  content += "Hostname: " + WiFi.hostname() + HTML_BR;
+  content += "MAC: " + WiFi.macAddress() + HTML_BR;
+  content += "IP Address: " + WiFi.localIP().toString() + HTML_BR;
+  content += "Subnet Mask: " + WiFi.subnetMask().toString() + HTML_BR;
+  content += "Gateway: " + WiFi.gatewayIP().toString() + HTML_BR;
+  content += "DNS (primary): " + WiFi.dnsIP().toString() + HTML_BR;
+  content += "SSID: " + WiFi.SSID() + HTML_BR;
+  content += "RSSI: " + String(WiFi.RSSI()) + HTML_BR;
+
+  server.send(200, "text/html", basicHTMLResponse("Diagnostics", content));
 }
 
 void handleNotFound(){
@@ -208,6 +223,7 @@ void setup(void){
   sensors.setResolution(12);
 
   // Connect to WiFi (and disable hosted AP)
+  WiFi.setSleepMode(WIFI_MODEM_SLEEP);
   WiFi.softAPdisconnect(true);
   WiFi.disconnect();
   WiFi.setAutoConnect(true);
@@ -229,6 +245,8 @@ void setup(void){
   server.on("/", handleRoot);
 
   server.on("/temp", handleTempRequest);
+
+  server.on("/diag", handleDiag);
 
   server.onNotFound(handleNotFound);
 
