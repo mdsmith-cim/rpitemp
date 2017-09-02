@@ -5,6 +5,7 @@ import sched, time
 from datetime import datetime
 import os
 import re
+import time
 from html_sanitizer import Sanitizer
 from apscheduler.schedulers.background import BackgroundScheduler
 import requests
@@ -19,6 +20,9 @@ def toggleF():
 
 def forceUpdate():
 	scheduler.add_job(update_temp)
+
+def updateTime():
+	timeDisp.set(time.strftime("%d/%m/%y %l:%M:%S %p"))
 
 def temp_to_format_str(t):
 	if faren:
@@ -121,7 +125,7 @@ root = Tk()
 root.title("Sensors")
 root.attributes('-fullscreen', True)
 
-mainframe = ttk.Frame(root, padding="3 3 12 12")
+mainframe = ttk.Frame(root, padding="12 12 12 12")
 mainframe.grid(column=0, row=0, sticky=(N, W, E, S))
 mainframe.columnconfigure(0, weight=1)
 mainframe.rowconfigure(0, weight=1)
@@ -133,31 +137,36 @@ tempIntake = StringVar()
 tempAmb = StringVar()
 tempCottage2 = StringVar()
 humid = StringVar()
+timeDisp = StringVar()
 
-ttk.Label(mainframe, text="Temperature", font=("Arial", 16)).grid(column=1, row=1, sticky=(N,E,W,S), columnspan=2)
+ttk.Label(mainframe, text="Temperature:", font=("Arial", 32)).grid(column=1, row=1, sticky=(N,E,W,S), columnspan=2)
 
-ttk.Label(mainframe, text="Outside", font=("Arial", 16)).grid(column=1, row=2, sticky=S)
-ttk.Label(mainframe, text="Water", font=("Arial", 16)).grid(column=2, row=2, sticky=S)
-ttk.Label(mainframe, text="Pump Intake", font=("Arial", 16)).grid(column=1, row=4, sticky=S)
-ttk.Label(mainframe, text="Cottage", font=("Arial", 16)).grid(column=2, row=4, sticky=S)
-ttk.Label(mainframe, text="Outside (Lake)", font=("Arial", 16)).grid(column=1, row=6, sticky=S)
-ttk.Label(mainframe, text="Cottage 2", font=("Arial", 16)).grid(column=2, row=6, sticky=S)
+ttk.Label(mainframe, text="Outside", font=("Arial", 32)).grid(column=1, row=2, sticky=S)
+ttk.Label(mainframe, text="Water", font=("Arial", 32)).grid(column=2, row=2, sticky=S)
+ttk.Label(mainframe, text="Pump Intake", font=("Arial", 32)).grid(column=1, row=4, sticky=S)
+ttk.Label(mainframe, text="Cottage", font=("Arial", 32)).grid(column=2, row=4, sticky=S)
+ttk.Label(mainframe, text="Outside (Lake)", font=("Arial", 32)).grid(column=1, row=6, sticky=S)
+ttk.Label(mainframe, text="Cottage 2", font=("Arial", 32)).grid(column=2, row=6, sticky=S)
+ttk.Label(mainframe, text="Time:", font=("Arial", 32)).grid(column=3, row=1, sticky=(N,E,W,S))
 
-ttk.Label(mainframe, text="Humidity (inside)", font=("Arial", 16)).grid(column=1, row=8, sticky=(N,E,W,S), columnspan=2)
+ttk.Label(mainframe, text="Humidity (inside):", font=("Arial", 32)).grid(column=1, row=8, sticky=(N,E,W,S), columnspan=2)
 
-ttk.Label(mainframe, textvariable=tempOutside, font=("Arial", 16)).grid(column=1, row=3, sticky=S)
-ttk.Label(mainframe, textvariable=tempLake, font=("Arial", 16)).grid(column=2, row=3, sticky=S)
-ttk.Label(mainframe, textvariable=tempIntake, font=("Arial", 16)).grid(column=1, row=5, sticky=S)
-ttk.Label(mainframe, textvariable=tempCottage, font=("Arial", 16)).grid(column=2, row=5, sticky=S)
-ttk.Label(mainframe, textvariable=tempAmb, font=("Arial", 16)).grid(column=1, row=7, sticky=S)
-ttk.Label(mainframe, textvariable=tempCottage2, font=("Arial", 16)).grid(column=2, row=7, sticky=S)
-ttk.Label(mainframe, textvariable=humid, font=("Arial", 16)).grid(column=1, row=9, sticky=S)
+ttk.Label(mainframe, textvariable=tempOutside, font=("Arial", 32)).grid(column=1, row=3, sticky=S)
+ttk.Label(mainframe, textvariable=tempLake, font=("Arial", 32)).grid(column=2, row=3, sticky=S)
+ttk.Label(mainframe, textvariable=tempIntake, font=("Arial", 32)).grid(column=1, row=5, sticky=S)
+ttk.Label(mainframe, textvariable=tempCottage, font=("Arial", 32)).grid(column=2, row=5, sticky=S)
+ttk.Label(mainframe, textvariable=tempAmb, font=("Arial", 32)).grid(column=1, row=7, sticky=S)
+ttk.Label(mainframe, textvariable=tempCottage2, font=("Arial", 32)).grid(column=2, row=7, sticky=S)
+ttk.Label(mainframe, textvariable=humid, font=("Arial", 32)).grid(column=1, row=9, sticky=S)
 
 # Update button
 ttk.Button(mainframe, text="Force update", command=forceUpdate).grid(column=1, row=10, stick=(W,S), columnspan=2)
 
 # Quit button
 ttk.Button(mainframe, text="Quit", command=root.destroy).grid(column=1, row=11, stick=(W,S))
+
+# Time
+ttk.Label(mainframe, textvariable=timeDisp, font=("Arial", 32)).grid(column=3, row=2, sticky=(N,E,W,S))
 
 # Fahrenheit checkbox
 global faren
@@ -175,6 +184,9 @@ scheduler = BackgroundScheduler()
 scheduler.add_job(update_temp)
 # Schedule every 5 minute execution
 scheduler.add_job(update_temp, 'interval', coalesce=True, minutes=5)
+
+# Schedule time update
+scheduler.add_job(updateTime, 'interval', coalesce=True, seconds=1)
 
 # Start scheduler
 scheduler.start()
