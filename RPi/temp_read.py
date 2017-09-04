@@ -9,14 +9,24 @@ import time
 from html_sanitizer import Sanitizer
 from apscheduler.schedulers.background import BackgroundScheduler
 import requests
+import csv
 
 non_decimal = re.compile(r'[^\d.]+')
 
-def toggleF():
-	global faren
-	global scheduler
-	faren = not(faren)
-	forceUpdate()
+def quitProgram():
+	csvfile.close()
+	scheduler.shutdown(False)
+	print("Exiting...")
+	root.destroy()
+
+def removeNonDecimal(text):
+	return non_decimal.sub('', text)
+
+#def toggleF():
+#	global faren
+#	global scheduler
+#	faren = not(faren)
+#	forceUpdate()
 
 def forceUpdate():
 	scheduler.add_job(update_temp)
@@ -25,10 +35,10 @@ def updateTime():
 	timeDisp.set(time.strftime("%d/%m/%y %l:%M:%S %p"))
 
 def temp_to_format_str(t):
-	if faren:
-		return str(round(9.0/5.0 * t + 32,2)) + " °F"
-	else:
-		return str(round(t,2)) + " °C"
+	#if faren:
+	#	return str(round(9.0/5.0 * t + 32,2)) + " °F"
+	#else:
+	return str(round(t,2)) + " °C"
 
 def update_temp():
 
@@ -42,6 +52,8 @@ def update_temp():
 	cot = cot.split("t=")
 	cot = cot[1].rstrip("\n")
 
+	cot = temp_to_format_str(float(cot)/1000)
+
 	f.close()
 
 	# Get local cottage temp and humidity from DHT
@@ -51,7 +63,7 @@ def update_temp():
 	tries = 0
 	while not(success):
 		try:
-			cot2 = f.readline()
+			cot2 = temp_to_format_str(float(f.readline())/1000)
 			success = True
 		except OSError as e:
 			tries = tries + 1
@@ -66,7 +78,7 @@ def update_temp():
 	tries = 0
 	while not(success):
 		try:
-			hm = f.readline()
+			hm = str(round(float(f.readline())/1000,2)) + " %"
 			success = True
 		except OSError as e:
 			tries = tries + 1
@@ -75,7 +87,11 @@ def update_temp():
 				break
 	
 	f.close()
-	
+
+	tempCottage.set(cot)
+	tempCottage2.set(cot2)	
+	humid.set(hm)
+
 	# Get info from pumphouse
 	r = requests.get("http://192.168.0.180/temp")
 	# Set encoding to UTF-8 since the HTML is in it but apparently the ESP sends a different one
@@ -83,10 +99,11 @@ def update_temp():
 	
 	# Throw error if applicable
 	if not(r.ok):
-		tempLake.set("ERR")
-		tempOutside.set("ERR")
-		tempIntake.set("ERR")
-		tempAmb.set("ERR")
+		lakeTempVar = "ERR"
+		outsideTempVar = "ERR"
+		intakeTempVar = "ERR"
+		ambientTempVar = "ERR"
+
 	else:
 
 		# Clean up and split response
@@ -96,31 +113,31 @@ def update_temp():
 		# Split on line breaks and remove all but temp info
 		txtSplit = txt.split("<br>")[1:5]
 		
-		if cot == "ERR":
-			tempCottage.set("ERR")
-		else:
-			tempCottage.set( temp_to_format_str(float(cot)/1000) )
-		if cot2 == "ERR":
-			tempCottage2.set("ERR")	
-		else:
-			tempCottage2.set( temp_to_format_str(float(cot2)/1000))
-		if hm == "ERR":
-			humid.set("ERR")
-		else:
-			humid.set(str(round(float(hm)/1000,2)) + " %")
-		
 		for item in txtSplit:
 			tempS = item.split(":")
-			tmpValue = non_decimal.sub('', tempS[1])
+			tmpValue = float(removeNonDecimal(tempS[1]))
 			if "Lake" == tempS[0]:
-				tempLake.set(temp_to_format_str(float(tmpValue)))
+				lakeTempVar = temp_to_format_str(tmpValue)
 			elif "Outside" == tempS[0]:
-				tempOutside.set(temp_to_format_str(float(tmpValue)))
+				outsideTempVar = temp_to_format_str(tmpValue)
 			elif "Pump intake" == tempS[0]:
-				tempIntake.set(temp_to_format_str(float(tmpValue)))
+				intakeTempVar = temp_to_format_str(tmpValue)
 			elif "Ambient outdoor" == tempS[0]:
-				tempAmb.set(temp_to_format_str(float(tmpValue)))
+				ambientTempVar = temp_to_format_str(tmpValue)
+
+	tempLake.set(lakeTempVar)
+	tempOutside.set(outsideTempVar)
+	tempIntake.set(intakeTempVar)
+	tempAmb.set(ambientTempVar)
+
+	csvwriter.writerow({'Time': time.strftime("%F %T"), 'Outside Temp': removeNonDecimal(outsideTempVar), 'Cottage Temp': removeNonDecimal(cot), 'Cottage Temp (DHT)': removeNonDecimal(cot2), 'Lake Temp': removeNonDecimal(lakeTempVar), 'Pump Intake': removeNonDecimal(intakeTempVar), 'Ambient Lake Temp': removeNonDecimal(ambientTempVar), 'Humidity': removeNonDecimal(hm)})
+
 	
+csvfile = open('sensor_log_' + time.strftime("%F_%T") + '.csv', 'w', newline='')
+fieldnames = ['Time', 'Outside Temp', 'Cottage Temp', 'Cottage Temp (DHT)', 'Lake Temp', 'Pump Intake','Ambient Lake Temp','Humidity']
+csvwriter = csv.DictWriter(csvfile, fieldnames)
+csvwriter.writeheader()
+
 root = Tk()
 root.title("Sensors")
 root.attributes('-fullscreen', True)
@@ -163,15 +180,15 @@ ttk.Label(mainframe, textvariable=humid, font=("Arial", 32)).grid(column=1, row=
 ttk.Button(mainframe, text="Force update", command=forceUpdate).grid(column=1, row=10, stick=(W,S), columnspan=2)
 
 # Quit button
-ttk.Button(mainframe, text="Quit", command=root.destroy).grid(column=1, row=11, stick=(W,S))
+ttk.Button(mainframe, text="Quit", command=quitProgram).grid(column=1, row=11, stick=(W,S))
 
 # Time
 ttk.Label(mainframe, textvariable=timeDisp, font=("Arial", 32)).grid(column=3, row=2, sticky=(N,E,W,S))
 
 # Fahrenheit checkbox
-global faren
-faren = False
-ttk.Checkbutton(mainframe, text='Fahrenheit', command=toggleF).grid(column=2, row=11, stick=(E,S))
+#global faren
+#faren = False
+#ttk.Checkbutton(mainframe, text='Fahrenheit', command=toggleF).grid(column=2, row=11, stick=(E,S))
 
 # Add padding to all items
 for child in mainframe.winfo_children(): child.grid_configure(padx=5, pady=5)
@@ -195,4 +212,4 @@ try:
 	# Execute main GUI loop
 	root.mainloop()
 except (KeyboardInterrupt, SystemExit):
-	scheduler.shutdown(False)
+	quitProgram()
