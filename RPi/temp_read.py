@@ -6,12 +6,16 @@ from datetime import datetime
 import os
 import re
 import time
+import signal
 from html_sanitizer import Sanitizer
 from apscheduler.schedulers.background import BackgroundScheduler
 import requests
 import csv
 
 non_decimal = re.compile(r'[^\d.]+')
+
+def exit_gracefully(signum, frame):
+	quitProgram()
 
 def quitProgram():
 	csvfile.close()
@@ -209,6 +213,9 @@ scheduler.add_job(updateTime, 'interval', coalesce=True, seconds=1)
 scheduler.start()
 
 try:
+	# Signal handler
+	signal.signal(signal.SIGINT, exit_gracefully)
+	signal.signal(signal.SIGTERM, exit_gracefully)
 	# Execute main GUI loop
 	root.mainloop()
 except (KeyboardInterrupt, SystemExit):
