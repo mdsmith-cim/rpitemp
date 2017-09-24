@@ -6,25 +6,52 @@
 #include <WiFiClient.h>
 #include <ESP8266WebServer.h>
 #include <Adafruit_MLX90614.h>
-#include <LiquidCrystal_I2C.h>
 #include <Wire.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
+#include <LiquidCrystal_I2C.h>
+#include <WiFiManager.h>
+#include <NTPClient.h>
+
+// Define OTA_PASSWORD and AP_SETUP_PASSWORD, both const char*
+#include <sensitive.h>
 
 #define ONE_WIRE_BUS 14
 #define HTTP_PORT 80
+#define UPDATE_PORT 8289
 #define BUTTON_PIN 0
 #define LCD_ADDR 0x3F
 #define BUTTON_DEBOUNCE_TIME 500 //ms
 #define TEMP_LCD_POLL 10000 //ms
 #define LCD_CHANGE 30000 //ms
+#define NTP_UPDATE_INTERVAL 600000 //ms
+#define WIFI_CONFIG_TIMEOUT 300 // seconds
 
+// Taken from Michael Margolis' TimeLib - various time macros and definitions
+/* Useful Constants */
+#define SECS_PER_MIN  (60UL)
+#define SECS_PER_HOUR (3600UL)
+#define SECS_PER_DAY  (SECS_PER_HOUR * 24UL)
+#define DAYS_PER_WEEK (7UL)
+#define SECS_PER_WEEK (SECS_PER_DAY * DAYS_PER_WEEK)
+#define SECS_PER_YEAR (SECS_PER_WEEK * 52UL)
+ 
+/* Useful Macros for getting elapsed time */
+#define numberOfSeconds(_time_) (_time_ % SECS_PER_MIN)  
+#define numberOfMinutes(_time_) ((_time_ / SECS_PER_MIN) % SECS_PER_MIN) 
+#define numberOfHours(_time_) (( _time_% SECS_PER_DAY) / SECS_PER_HOUR)
+#define elapsedDays(_time_) ( _time_ / SECS_PER_DAY)  // this is number of days since Jan 1 1970
+
+// HTML line break
 const char* HTML_BR = "<br>";
+// NTP server IP
+const char* NTP_SERVER = "192.168.0.190";
+// AP name for configuration
+const char* AP_NAME = "Temp Sensor Setup";
 
-// Wifi info
-const char* ssid = "Sensor Net";
-const char* password = "HBqSKtfrOUejsrXAM0GQkHiC";
-const char* otaPassword = "updateESP8266Sensor";
+// NTP client
+WiFiUDP ntpUDP;
+NTPClient ntpClient(ntpUDP, NTP_SERVER);
 
 // Create basic HTTP server
 ESP8266WebServer server(HTTP_PORT);
@@ -51,6 +78,9 @@ int volatile dispMLX;
 unsigned long volatile lastLCDTempDisplay; 
 unsigned long volatile lastLCDChange;
 
+// UTC time on startup
+unsigned long time_on_startup;
+
 // Create a basic UTF-8 HTML page including header and footer
 String basicHTMLResponse(String title, String content) {
   String response = "<!doctype html><html><head><title>" + title + "</title><meta charset=\"utf-8\" /><meta http-equiv=\"Content-type\" content=\"text/html; charset=utf-8\" /></head><body>";
@@ -68,7 +98,10 @@ void handleRoot() {
 }
 
 void handleDiag() {
-  String content = "<b>Dianostic WiFi Info</b><br>";
+
+  unsigned long timeSinceStart = ntpClient.getEpochTime() - time_on_startup;
+
+  String content = "<b>Dianostic Info</b><br>";
   content += "Hostname: " + WiFi.hostname() + HTML_BR;
   content += "MAC: " + WiFi.macAddress() + HTML_BR;
   content += "IP Address: " + WiFi.localIP().toString() + HTML_BR;
@@ -77,6 +110,8 @@ void handleDiag() {
   content += "DNS (primary): " + WiFi.dnsIP().toString() + HTML_BR;
   content += "SSID: " + WiFi.SSID() + HTML_BR;
   content += "RSSI: " + String(WiFi.RSSI()) + HTML_BR;
+  content += "Time: " + ntpClient.getFormattedTime() + " UTC" + HTML_BR;
+  content += "Time since start: " + String(elapsedDays(timeSinceStart)) + " days " + String(numberOfHours(timeSinceStart)) + " hours " + String(numberOfMinutes(timeSinceStart)) + " minutes " + String(numberOfSeconds(timeSinceStart)) + " seconds" + HTML_BR;
 
   server.send(200, "text/html", basicHTMLResponse("Diagnostics", content));
 }
@@ -204,9 +239,6 @@ void setup(void){
   // Turn on the blacklight
   lcd.backlight();
 
-  // Configure LCD for MLX display
-  setupLCDMLX();
-
   Serial.println();
 
   // Init OneWire
@@ -222,26 +254,27 @@ void setup(void){
   // set the resolution to 12 bits
   sensors.setResolution(12);
 
-  // Connect to WiFi (and disable hosted AP)
-  WiFi.setSleepMode(WIFI_MODEM_SLEEP);
-  WiFi.softAPdisconnect(true);
-  WiFi.disconnect();
-  WiFi.setAutoConnect(true);
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(ssid, password);
-  Serial.println();
+  // Use WiFi connection manager to hande all WiFi stuff like SSID and password
+  WiFiManager wifiManager;
 
-  // Wait for connection
-  Serial.print("Connecting to WiFi..");
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(500);
-    Serial.print(".");
-  }
-  Serial.println();
+  Serial.println("Connecting to WiFi...");
   
+  lcd.clear();
+  lcd.print("AP Setup");
+  
+  wifiManager.setRemoveDuplicateAPs(false);
+  wifiManager.setConfigPortalTimeout(WIFI_CONFIG_TIMEOUT);
+  // AutoConnect will connect or launch a soft AP to allow config if it can't connect
+  Serial.println(wifiManager.autoConnect(AP_NAME, AP_SETUP_PASSWORD) ? "Connected!" : "Timed out...");
+  
+  // Print WiFi info to serial
   WiFi.printDiag(Serial);
   Serial.print("IP address: "); Serial.println(WiFi.localIP());
   
+  // Configure LCD for MLX display
+  setupLCDMLX();
+
+  // HTTP server setup
   server.on("/", handleRoot);
 
   server.on("/temp", handleTempRequest);
@@ -256,9 +289,9 @@ void setup(void){
   Serial.println("Setting up OTA update...");
 
   //Setup OTA update
-  ArduinoOTA.setPort(8289);
+  ArduinoOTA.setPort(UPDATE_PORT);
 
-  ArduinoOTA.setPassword(otaPassword);
+  ArduinoOTA.setPassword(OTA_PASSWORD);
 
   ArduinoOTA.onStart([]() {
     Serial.println("Starting update...");
@@ -278,6 +311,15 @@ void setup(void){
     else if (error == OTA_END_ERROR) Serial.println("End Failed");
   });
   ArduinoOTA.begin();
+
+  // NTP setup
+  Serial.println("Setting up NTP...");
+
+  ntpClient.begin();
+  ntpClient.setUpdateInterval(NTP_UPDATE_INTERVAL);
+  ntpClient.forceUpdate();
+
+  time_on_startup = ntpClient.getEpochTime();
 
   Serial.println("Setup complete.");
 }
@@ -346,11 +388,14 @@ void loop(void){
       lcd.print(WiFi.localIP());
       
       lcd.setCursor(11,1);
-      lcd.print(WiFi.isConnected() ? "True" : "False");
+      lcd.print(WiFi.isConnected() ? "Yes" : "No");
     }
   }
 
   // Handle update requests
   ArduinoOTA.handle();
-}
 
+  // Handle NTP update
+  ntpClient.update();
+
+}
