@@ -1,6 +1,5 @@
 #include <Arduino.h>
 #include <WiFiUdp.h>
-#include <ArduinoOTA.h>
 #include <ESP8266WiFi.h>
 #include <ESP8266mDNS.h>
 #include <WiFiClient.h>
@@ -12,6 +11,7 @@
 #include <LiquidCrystal_I2C.h>
 #include <WiFiManager.h>
 #include <NTPClient.h>
+#include <ArduinoOTA.h>
 
 // Define OTA_PASSWORD and AP_SETUP_PASSWORD, both const char*
 #include <sensitive.h>
@@ -263,10 +263,15 @@ void setup(void){
   lcd.print("AP Setup");
   
   wifiManager.setRemoveDuplicateAPs(false);
+  
   wifiManager.setConfigPortalTimeout(WIFI_CONFIG_TIMEOUT);
+  
   // AutoConnect will connect or launch a soft AP to allow config if it can't connect
   Serial.println(wifiManager.autoConnect(AP_NAME, AP_SETUP_PASSWORD) ? "Connected!" : "Timed out...");
-  
+
+  // It's possible that the portal might timeout and reach here; in that case, make sure WiFi is STA only
+  WiFi.mode(WIFI_STA);
+
   // Print WiFi info to serial
   WiFi.printDiag(Serial);
   Serial.print("IP address: "); Serial.println(WiFi.localIP());
