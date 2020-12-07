@@ -124,7 +124,7 @@ class TempRecorder:
                 draw.text((0, 45), f'DS18 T: {ds18T:.1f} °C', fill='white')
 
             self.accumulated_data.append({
-                'Time': time.strftime("%F_%T"),
+                'Time': time.strftime("%F %T"),
                 'BME280 Temperature': bme280T,
                 'BME 280 Humidity': bme280H,
                 'BME 280 Pressure': bme280P,
