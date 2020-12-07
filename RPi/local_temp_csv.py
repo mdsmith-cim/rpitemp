@@ -31,6 +31,7 @@ class TempRecorder:
         self.keepRunning = True
         self.accumulated_data = []
         self.start_time = 0
+        self.csv_file = None
         self.e = threading.Event()
 
     def writeToDisk(self):
