@@ -137,9 +137,6 @@ class TempRecorder:
         print('Bye!')
         sys.exit(0)
 
-        # except (KeyboardInterrupt, SystemExit):
-        #     self.writeToDisk()
-
 
 if __name__ == "__main__":
     TempRecorder().main()
