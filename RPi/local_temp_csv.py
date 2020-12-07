@@ -13,12 +13,11 @@ import Adafruit_DHT
 import pandas as pd
 import signal
 import threading
+import argparse
 
 # Constants
-# WRITE_DELAY = 1800  # in seconds, time to wait between writing to SD card
-# DELAY_BETWEEN_MEASUREMENTS = 300  # in seconds, time to wait before getting new data
-WRITE_DELAY = 60
-DELAY_BETWEEN_MEASUREMENTS = 5
+WRITE_DELAY = 1800  # in seconds, time to wait between writing to SD card
+DELAY_BETWEEN_MEASUREMENTS = 300  # in seconds, time to wait before getting new data
 DHT_PIN = 6
 DF_COLUMNS = ['Time', 'BME280 Temperature', 'BME 280 Humidity', 'BME 280 Pressure',
               'BME 280 Altitude', 'MCP 9808 Temperature', 'DS18B20 Temperature', 'DHT22 Temperature',
@@ -27,12 +26,13 @@ DF_COLUMNS = ['Time', 'BME280 Temperature', 'BME 280 Humidity', 'BME 280 Pressur
 
 class TempRecorder:
 
-    def __init__(self):
+    def __init__(self, quietMode=False):
         self.keepRunning = True
         self.accumulated_data = []
         self.start_time = 0
         self.csv_file = None
         self.e = threading.Event()
+        self.quietMode = quietMode
 
     def writeToDisk(self):
         print('*****Writing data to disk****')
@@ -47,7 +47,7 @@ class TempRecorder:
         self.e.set()
 
     def main(self):
-
+        print('Starting Data Recorder...')
         # Init i2c
         i2c = busio.I2C(board.SCL, board.SDA)
         # init bme280, MCP sensors
@@ -83,29 +83,36 @@ class TempRecorder:
         signal.signal(signal.SIGTERM, self.exitGracefully)
 
         while self.keepRunning:
-            print('--------------\nBME 280')
+
             bme280T = bme280.temperature
             bme280H = bme280.relative_humidity
             bme280P = bme280.pressure
             bme280A = bme280.altitude
-            print("Temperature: %0.1f C" % bme280T)
-            print("Humidity: %0.1f %%" % bme280H)
-            print("Pressure: %0.1f hPa" % bme280P)
-            print("Altitude = %0.2f meters\n" % bme280A)
 
             mcpT = mcp.temperature
-            print("MCP9808 Temperature: {} C\n".format(mcpT))
 
             ds18T = ds18b20.get_temperature()
-            print('DS18B20 Temperature: {0:0.3f} °C\n'.format(ds18T))
 
-            print('DHT22')
             DHT_humidity, DHT_temperature = Adafruit_DHT.read_retry(dhtsensor, DHT_PIN)
-            if DHT_humidity is not None and DHT_temperature is not None:
-                print(f'Temperature: {DHT_temperature:.1f}')
-                print(f'Humidity: {DHT_humidity:.1f}')
-            else:
-                print('DHT22 read failure.')
+
+            if not self.quietMode:
+                print('--------------\nBME 280')
+                print("Temperature: %0.1f C" % bme280T)
+                print("Humidity: %0.1f %%" % bme280H)
+                print("Pressure: %0.1f hPa" % bme280P)
+                print("Altitude = %0.2f meters\n" % bme280A)
+
+                print("MCP9808 Temperature: {} C\n".format(mcpT))
+
+                print('DS18B20 Temperature: {0:0.3f} °C\n'.format(ds18T))
+
+                print('DHT22')
+
+                if DHT_humidity is not None and DHT_temperature is not None:
+                    print(f'Temperature: {DHT_temperature:.1f}')
+                    print(f'Humidity: {DHT_humidity:.1f}')
+                else:
+                    print('DHT22 read failure.')
 
             with canvas(lcd) as draw:
                 # draw.rectangle(lcd.bounding_box, outline="white", fill="black")
@@ -140,4 +147,9 @@ class TempRecorder:
 
 
 if __name__ == "__main__":
-    TempRecorder().main()
+    parser = argparse.ArgumentParser(description='Record temp and humidity data to a CSV file.')
+    parser.add_argument('--quiet', '-q', action='store_true',
+                        help='Active quiet mode to suppress printing of data to terminal/log')
+
+    args = parser.parse_args()
+    TempRecorder(quietMode=args.quiet).main()
