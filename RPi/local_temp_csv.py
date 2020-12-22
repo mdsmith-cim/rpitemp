@@ -69,6 +69,9 @@ class TempRecorder:
         ds18b20 = DS18B20()
 
         # Wait for correct time
+        print('Waiting for time sync...')
+        with canvas(lcd) as draw:
+            draw.text((0, 0), 'Waiting for timesync..', fill='white')
         subprocess.run(["chronyc", "waitsync"], check=True)
         print('Time synchronized!')
 
