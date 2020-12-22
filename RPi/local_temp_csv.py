@@ -14,6 +14,7 @@ import pandas as pd
 import signal
 import threading
 import argparse
+import subprocess
 
 # Constants
 WRITE_DELAY = 1800  # in seconds, time to wait between writing to SD card
@@ -66,6 +67,10 @@ class TempRecorder:
 
         # uses kernel mode driver
         ds18b20 = DS18B20()
+
+        # Wait for correct time
+        subprocess.run(["chronyc", "waitsync"], check=True)
+        print('Time synchronized!')
 
         self.csv_file = Path(f'/measurements/recorded_data_{time.strftime("%F_%T")}.csv')
 
