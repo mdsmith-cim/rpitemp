@@ -58,8 +58,6 @@
 #include <DallasTemperature.h>
 #include <OneWire.h>
 
-#define COMPARE_TEMP 0 // Send temperature only if changed? 1 = Yes 0 = No
-
 #define ONE_WIRE_BUS 7 // Pin where dallase sensor is connected 
 #define MAX_ATTACHED_DS18B20 16
 
@@ -67,21 +65,27 @@ unsigned long SLEEP_TIME = 300000; // Sleep time between reads (in milliseconds)
 
 OneWire oneWire(ONE_WIRE_BUS); // Setup a oneWire instance to communicate with any OneWire devices (not just Maxim/Dallas temperature ICs)
 DallasTemperature sensors(&oneWire); // Pass the oneWire reference to Dallas Temperature. 
-float lastTemperature[MAX_ATTACHED_DS18B20];
 int numSensors=0;
 bool receivedConfig = false;
 bool metric = true;
 // Initialize temperature message
-MyMessage msg(0,V_TEMP);
+MyMessage msg(1, V_TEMP);
+MyMessage msgVolt(0, V_VOLTAGE);
+
+// Battery level
+#include <Battery.h>
+Battery batt = Battery(2500, 4200, A0);
 
 void before()
 {
   // Startup up the OneWire library
   sensors.begin();
+  batt.begin(5100, 1.0, &sigmoidal);
 }
 
 void setup()  
 { 
+  analogReference(DEFAULT);
   // requestTemperatures() will not block current thread
   sensors.setWaitForConversion(false);
 }
@@ -90,13 +94,17 @@ void presentation() {
   // Send the sketch version information to the gateway and Controller
   sendSketchInfo("Backyard Temp Sensor", "1.0");
 
+  //Present battery voltage level
+  present(0, S_MULTIMETER);
+
   // Fetch the number of attached temperature sensors  
   numSensors = sensors.getDeviceCount();
 
   // Present all sensors to controller
-  for (int i=0; i<numSensors && i<MAX_ATTACHED_DS18B20; i++) {   
-     present(i, S_TEMP);
+  for (int i=0; i< numSensors && i<MAX_ATTACHED_DS18B20; i++) {   
+     present(i+1, S_TEMP);
   }
+
 }
 
 void loop()     
@@ -112,21 +120,21 @@ void loop()
   // Read temperatures and send them to controller 
   for (int i=0; i<numSensors && i<MAX_ATTACHED_DS18B20; i++) {
  
-    // Fetch and round temperature to one decimal
-    float temperature = static_cast<float>(static_cast<int>((getControllerConfig().isMetric?sensors.getTempCByIndex(i):sensors.getTempFByIndex(i)) * 10.)) / 10.;
+    // Fetch temp
+    float temperature = getControllerConfig().isMetric?sensors.getTempCByIndex(i):sensors.getTempFByIndex(i);
  
-    // Only send data if temperature has changed and no error
-    #if COMPARE_TEMP == 1
-    if (lastTemperature[i] != temperature && temperature != -127.00 && temperature != 85.00) {
-    #else
-    if (temperature != -127.00 && temperature != 85.00) {
-    #endif
     // Send in the new temperature
-    send(msg.setSensor(i).set(temperature,1));
-    // Save new temperatures for next compare
-    lastTemperature[i]=temperature;
-    }
+    // Error if -127.0 or 85, but let that pass through to controller for debug purposes
+    send(msg.setSensor(i+1).set(temperature, 2));
+    
   }
+
+  // get the battery status
+  uint16_t battVoltage = batt.voltage();
+  uint8_t battLevel = batt.level(battVoltage);
+  CORE_DEBUG(PSTR("BATT:mV=%" PRIu16 ",LVL=%" PRIu8 "\n"), battVoltage, battLevel);
+  sendBatteryLevel(battLevel);
+  send(msgVolt.set(battVoltage / 1000.0f, 3));
 
   // Wait for next sensor probe
   sleep(SLEEP_TIME);

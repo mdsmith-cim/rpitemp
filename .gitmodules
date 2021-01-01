@@ -1,0 +1,3 @@
+[submodule "Walkley_OutdoorSensor/lib/BatterySense"]
+	path = Walkley_OutdoorSensor/lib/BatterySense
+	url = git@github.com:rlogiacco/BatterySense.git
