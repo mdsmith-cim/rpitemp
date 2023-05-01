@@ -8,7 +8,6 @@ import adafruit_mcp9808
 from luma.core.interface.serial import i2c as i2c_luma
 from luma.core.render import canvas
 from luma.oled.device import sh1106
-from ds18b20 import DS18B20
 import Adafruit_DHT
 import pandas as pd
 import signal
@@ -19,9 +18,9 @@ import subprocess
 # Constants
 WRITE_DELAY = 1800  # in seconds, time to wait between writing to SD card
 DELAY_BETWEEN_MEASUREMENTS = 300  # in seconds, time to wait before getting new data
-DHT_PIN = 6
+DHT_PIN = 26
 DF_COLUMNS = ['Time', 'BME280 Temperature', 'BME 280 Humidity', 'BME 280 Pressure',
-              'BME 280 Altitude', 'MCP 9808 Temperature', 'DS18B20 Temperature', 'DHT22 Temperature',
+              'BME 280 Altitude', 'MCP 9808 Temperature', 'DHT22 Temperature',
               'DHT 22 Humidity']
 
 
@@ -56,7 +55,7 @@ class TempRecorder:
         mcp = adafruit_mcp9808.MCP9808(i2c)
 
         # location's pressure (hPa) at sea level
-        bme280.sea_level_pressure = 1017.1
+        bme280.sea_level_pressure = 1013.0
 
         # init lcd screen - needs separate i2c library
         i2c_lcd = i2c_luma(port=1, address=0x3C)
@@ -64,9 +63,6 @@ class TempRecorder:
 
         # initialize dht and ds18b20 sensors
         dhtsensor = Adafruit_DHT.AM2302
-
-        # uses kernel mode driver
-        ds18b20 = DS18B20()
 
         # Wait for correct time
         print('Waiting for time sync...')
@@ -99,9 +95,10 @@ class TempRecorder:
 
             mcpT = mcp.temperature
 
-            ds18T = ds18b20.get_temperature()
-
+            DHT_read_success = False
             DHT_humidity, DHT_temperature = Adafruit_DHT.read_retry(dhtsensor, DHT_PIN)
+            if DHT_humidity is not None and DHT_temperature is not None:
+                    DHT_read_success = True
 
             if not self.quietMode:
                 print('--------------\nBME 280')
@@ -112,11 +109,9 @@ class TempRecorder:
 
                 print("MCP9808 Temperature: {} C\n".format(mcpT))
 
-                print('DS18B20 Temperature: {0:0.3f} °C\n'.format(ds18T))
-
                 print('DHT22')
 
-                if DHT_humidity is not None and DHT_temperature is not None:
+                if DHT_read_success:
                     print(f'Temperature: {DHT_temperature:.1f}')
                     print(f'Humidity: {DHT_humidity:.1f}')
                 else:
@@ -129,7 +124,11 @@ class TempRecorder:
                 draw.text((0, 18), f'BME P: {bme280P:.1f} hPa', fill='white')
                 draw.text((0, 27), f'BME A: {bme280A:.2f} m', fill='white')
                 draw.text((0, 36), f'MCP T: {mcpT:.1f} °C', fill='white')
-                draw.text((0, 45), f'DS18 T: {ds18T:.1f} °C', fill='white')
+                if DHT_read_success:
+                    draw.text((0, 45), f'DHT T: {DHT_temperature:.1f} °C', fill='white')
+                    draw.text((0, 54), f'DHT H: {DHT_humidity:.1f} %', fill='white')
+                else:
+                    draw.text((0, 45), 'DHT Fail', fill='white')
 
             self.accumulated_data.append({
                 'Time': time.strftime("%F %T"),
@@ -138,7 +137,6 @@ class TempRecorder:
                 'BME 280 Pressure': bme280P,
                 'BME 280 Altitude': bme280A,
                 'MCP 9808 Temperature': mcpT,
-                'DS18B20 Temperature': ds18T,
                 'DHT22 Temperature': DHT_temperature,
                 'DHT 22 Humidity': DHT_humidity
             })

@@ -65,9 +65,9 @@ unsigned long SLEEP_TIME = 300000; // Sleep time between reads (in milliseconds)
 
 OneWire oneWire(ONE_WIRE_BUS); // Setup a oneWire instance to communicate with any OneWire devices (not just Maxim/Dallas temperature ICs)
 DallasTemperature sensors(&oneWire); // Pass the oneWire reference to Dallas Temperature. 
-int numSensors=0;
 bool receivedConfig = false;
 bool metric = true;
+uint8_t numSensors = 0;
 // Initialize temperature message
 MyMessage msg(1, V_TEMP);
 MyMessage msgVolt(0, V_VOLTAGE);
@@ -99,6 +99,7 @@ void presentation() {
 
   // Fetch the number of attached temperature sensors  
   numSensors = sensors.getDeviceCount();
+  CORE_DEBUG(PSTR("NUM TEMP=%" PRIu8 "\n"), numSensors);
 
   // Present all sensors to controller
   for (int i=0; i< numSensors && i<MAX_ATTACHED_DS18B20; i++) {   

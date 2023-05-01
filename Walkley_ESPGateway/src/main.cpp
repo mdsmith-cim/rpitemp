@@ -53,6 +53,7 @@
  */
 
 #include <Arduino.h>
+// Below specifies MY_WIFI_SSID and MY_WIFI_PASSWORD
 #include <wifi_credentials.h>
 
 // Enable debug prints to serial monitor
@@ -98,36 +99,11 @@
 // Led pins used if blinking feature is enabled above
 #define MY_DEFAULT_ERR_LED_PIN LED_BUILTIN  // Error led pin
 
-#include <ArduinoOTA.h>
 #include <MySensors.h>
 
 void setup()
 {
 	// Setup locally attached sensors
-	ArduinoOTA.onStart([]() {
-		Serial.println("ArduinoOTA start");
-	});
-	ArduinoOTA.onEnd([]() {
-		Serial.println("\nArduinoOTA end");
-	});
-	ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
-		Serial.printf("OTA Progress: %u%%\r", (progress / (total / 100)));
-	});
-	ArduinoOTA.onError([](ota_error_t error) {
-		Serial.printf("Error[%u]: ", error);
-		if (error == OTA_AUTH_ERROR) {
-			Serial.println("Auth Failed");
-		} else if (error == OTA_BEGIN_ERROR) {
-			Serial.println("Begin Failed");
-		} else if (error == OTA_CONNECT_ERROR) {
-			Serial.println("Connect Failed");
-		} else if (error == OTA_RECEIVE_ERROR) {
-			Serial.println("Receive Failed");
-		} else if (error == OTA_END_ERROR) {
-			Serial.println("End Failed");
-		}
-	});
-	ArduinoOTA.begin();
 }
 
 void presentation()
@@ -138,5 +114,4 @@ void presentation()
 void loop()
 {
 	// Send locally attached sensors data here
-	ArduinoOTA.handle();
 }
